@@ -3,37 +3,24 @@ using System.Net;
 
 namespace IPFilter;
 
-public class LogAnalyzer(Options options)
+public class LogAnalyzer()
 {
-    public ConcurrentDictionary<string, int> Analyze()
+    public ConcurrentDictionary<string, int> Analyze(IEnumerable<string>? lines, string addressStart, string addressMask)
     {
         var results = new ConcurrentDictionary<string, int>();
 
-        try
+        Parallel.ForEach(lines, (line) =>
         {
-            if (!File.Exists(options.FileLog))
-            {
-                Console.WriteLine("Log file not found.");
-                return results;
-            }
+            var parts = line.Split(' ');
+            if (parts.Length < 2) return;
 
-            Parallel.ForEach(File.ReadLines(options.FileLog), (line) =>
-            {
-                var parts = line.Split(' ');
-                if (parts.Length < 2) return;
+            var ipString = parts[0];
+            if (!IPAddress.TryParse(ipString, out var ipAddress)) return;
 
-                var ipString = parts[0];
-                if (!IPAddress.TryParse(ipString, out var ipAddress)) return;
-            
-                if (!InRange(ipAddress, options.AddressStart, options.AddressMask)) return;
-            
-                results.AddOrUpdate(ipString, 1, (key, oldValue) => oldValue + 1);
-            });
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"An error occurred while reading the log file: {ex.Message}");
-        }
+            if (!InRange(ipAddress, addressStart, addressMask)) return;
+
+            results.AddOrUpdate(ipString, 1, (key, oldValue) => oldValue + 1);
+        });
 
         return results;
     }
@@ -61,9 +48,22 @@ public class LogAnalyzer(Options options)
 
         var mask = maskLength == 0 ? 0 : ~((uint)1 << (32 - maskLength)) + 1;
 
-        var ipAsUint = BitConverter.ToUInt32(ipAddress.GetAddressBytes(), 0);
-        var startAsUint = BitConverter.ToUInt32(startAddress.GetAddressBytes(), 0);
+        var ipAsUint = IpAddressToUInt32(ipAddress);
+        var startAsUint = IpAddressToUInt32(startAddress);
 
         return (ipAsUint & mask) >= (startAsUint & mask);
+    }
+    
+    private uint IpAddressToUInt32(IPAddress ipAddress)
+    {
+        var addressBytes = ipAddress.GetAddressBytes();
+
+        // Перевернуть порядок байтов для little-endian систем
+        if (BitConverter.IsLittleEndian)
+        {
+            Array.Reverse(addressBytes);
+        }
+
+        return BitConverter.ToUInt32(addressBytes, 0);
     }
 }

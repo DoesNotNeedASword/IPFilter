@@ -2,13 +2,16 @@
 using IPFilter;
 
 Parser.Default.ParseArguments<Options>(args)
-    .WithParsed(opts =>
+    .WithParsed(options =>
     {
         try
         {
-            var analyzer = new LogAnalyzer(opts);
-            var results = analyzer.Analyze();
-            OutputWriter.WriteResults(opts.FileOutput, results);
+            var reader = new LogReader(options.FileLog);
+            var analyzer = new LogAnalyzer();
+
+            var lines = reader.ReadLines();
+            var results = analyzer.Analyze(lines, options.AddressStart, options.AddressMask);
+            OutputWriter.WriteResults(options.FileOutput, results);
         }
         catch (Exception ex)
         {

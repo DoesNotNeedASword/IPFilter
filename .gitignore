@@ -17,7 +17,8 @@ nupkg/
 .editorconfig
 # Fleet
 .fleet/
-
+*.log
+*.txt
 # Code Rush
 .cr/
 *.tar
