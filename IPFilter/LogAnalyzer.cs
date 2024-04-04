@@ -5,38 +5,32 @@ namespace IPFilter;
 
 public class LogAnalyzer(Options options)
 {
-    public ConcurrentDictionary<string, int> Analyze()
+    public async Task<Dictionary<string, int>> AnalyzeAsync(IAsyncEnumerable<string> lines)
     {
-        var results = new ConcurrentDictionary<string, int>();
+        var results = new Dictionary<string, int>();
 
-        try
+        await foreach(var line in lines)
         {
-            if (!File.Exists(options.FileLog))
+            var parts = line.Split(' ');
+            if (parts.Length < 2) continue;
+
+            var ipString = parts[0];
+            if (!IPAddress.TryParse(ipString, out var ipAddress)) continue;
+
+            if (!InRange(ipAddress, options.AddressStart, options.AddressMask)) continue;
+
+            lock (results)
             {
-                Console.WriteLine("Log file not found.");
-                return results;
+                if (results.TryGetValue(ipString, out var count))
+                    results[ipString] = count + 1;
+                else
+                    results.TryAdd(ipString, 1);
             }
-
-            Parallel.ForEach(File.ReadLines(options.FileLog), (line) =>
-            {
-                var parts = line.Split(' ');
-                if (parts.Length < 2) return;
-
-                var ipString = parts[0];
-                if (!IPAddress.TryParse(ipString, out var ipAddress)) return;
-            
-                if (!InRange(ipAddress, options.AddressStart, options.AddressMask)) return;
-            
-                results.AddOrUpdate(ipString, 1, (key, oldValue) => oldValue + 1);
-            });
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"An error occurred while reading the log file: {ex.Message}");
         }
 
         return results;
     }
+
 
     private bool InRange(IPAddress ipAddress, string addressStart, string addressMask)
     {

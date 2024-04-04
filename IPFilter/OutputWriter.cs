@@ -4,14 +4,14 @@ namespace IPFilter;
 
 public class OutputWriter
 {
-    public static void WriteResults(string outputPath, ConcurrentDictionary<string, int> results)
+    public static async Task WriteResults(string outputPath, Dictionary<string, int> results)
     {
         try
         {
-            using var file = new StreamWriter(outputPath);
+            await using var file = new StreamWriter(outputPath);
             foreach (var entry in results)
             {
-                file.WriteLine($"{entry.Key} {entry.Value}");
+                await file.WriteLineAsync($"{entry.Key} {entry.Value}");
             }
         }
         catch (Exception ex)
