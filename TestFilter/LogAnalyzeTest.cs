@@ -1,6 +1,5 @@
 using System.Globalization;
 using IPFilter;
-using Xunit;
 
 namespace TestFilter;
 
