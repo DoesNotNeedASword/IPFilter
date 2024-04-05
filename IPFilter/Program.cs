@@ -10,7 +10,7 @@ Parser.Default.ParseArguments<Options>(args)
             var analyzer = new LogAnalyzer();
 
             var lines = reader.ReadLines();
-            var results = analyzer.Analyze(lines, options.AddressStart, options.AddressMask);
+            var results = analyzer.Analyze(lines, options);
             OutputWriter.WriteResults(options.FileOutput, results);
         }
         catch (Exception ex)

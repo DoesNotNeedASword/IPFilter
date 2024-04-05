@@ -1,23 +1,29 @@
 ﻿using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net;
 
 namespace IPFilter;
 
-public class LogAnalyzer()
+public class LogAnalyzer
 {
-    public ConcurrentDictionary<string, int> Analyze(IEnumerable<string>? lines, string addressStart, string addressMask)
+    public ConcurrentDictionary<string, int> Analyze(IEnumerable<string> lines, Options options)
     {
         var results = new ConcurrentDictionary<string, int>();
 
         Parallel.ForEach(lines, (line) =>
         {
-            var parts = line.Split(' ');
-            if (parts.Length < 2) return;
+            var parts = line.Split(new[] { ' ' }, 2); // Используйте перегрузку Split для разделения только на две части
+            if (parts.Length < 2) return; // Проверка, что строка содержит и IP, и дату
 
             var ipString = parts[0];
             if (!IPAddress.TryParse(ipString, out var ipAddress)) return;
 
-            if (!InRange(ipAddress, addressStart, addressMask)) return;
+            // dateString содержит полную строку даты и времени в формате ISO 8601
+            var dateString = parts[1];
+            if (!DateTime.TryParseExact(dateString, "yyyy-MM-ddTHH:mm:ssK",
+                    CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var logTime)) return;
+
+            if (!InRange(ipAddress, logTime, options)) return;
 
             results.AddOrUpdate(ipString, 1, (key, oldValue) => oldValue + 1);
         });
@@ -25,23 +31,23 @@ public class LogAnalyzer()
         return results;
     }
 
-    private bool InRange(IPAddress ipAddress, string addressStart, string addressMask)
+    private bool InRange(IPAddress ipAddress, DateTime logTime, Options options)
     {
-        if (string.IsNullOrEmpty(addressStart))
+        if (string.IsNullOrEmpty(options.AddressStart))
             return true;
 
-        if (!IPAddress.TryParse(addressStart, out var startAddress))
+        if (!IPAddress.TryParse(options.AddressStart, out var startAddress))
         {
-            Console.WriteLine($"Invalid start address: {addressStart}");
+            Console.WriteLine($"Invalid start address: {options.AddressStart}");
             return false;
         }
 
         var maskLength = 32; 
-        if (!string.IsNullOrEmpty(addressMask))
+        if (!string.IsNullOrEmpty(options.AddressMask))
         {
-            if (!int.TryParse(addressMask, out maskLength) || maskLength < 0 || maskLength > 32)
+            if (!int.TryParse(options.AddressMask, out maskLength) || maskLength < 0 || maskLength > 32)
             {
-                Console.WriteLine($"Invalid mask: {addressMask}");
+                Console.WriteLine($"Invalid mask: {options.AddressMask}");
                 return false;
             }
         }
@@ -51,7 +57,12 @@ public class LogAnalyzer()
         var ipAsUint = IpAddressToUInt32(ipAddress);
         var startAsUint = IpAddressToUInt32(startAddress);
 
-        return (ipAsUint & mask) >= (startAsUint & mask);
+        bool isInIpRange = (ipAsUint & mask) >= (startAsUint & mask);
+    
+        bool isInTimeRange = (!options.MinTime.HasValue || logTime >= options.MinTime.Value) &&
+                             (!options.MaxTime.HasValue || logTime <= options.MaxTime.Value);
+
+        return isInIpRange && isInTimeRange;
     }
     
     private uint IpAddressToUInt32(IPAddress ipAddress)
