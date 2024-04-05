@@ -43,8 +43,8 @@ To execute the program, use the following command in the terminal or command pro
 ## Input File Format
 
 The log file should contain lines with IPv4 addresses followed by the timestamp of the request, separated by a space. Each line should follow the pattern: `IP_ADDRESS TIMESTAMP`. For example:
-
+```
 192.168.1.100 2024-04-01T08:15:30+00:00 
-
 192.168.1.101 2024-04-01T08:17:22+00:00
+```
 
