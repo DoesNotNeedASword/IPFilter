@@ -1,65 +1,77 @@
+using System.Globalization;
 using IPFilter;
+using Xunit;
 
 namespace TestFilter;
 
 public class LogAnalyzeTests
 {
     [Fact]
-    public void Analyze_ValidData_ReturnsCorrectCount()
+    public void Analyze_WithinTimeRangeAndIPRange_ShouldCountOccurrences()
     {
+        var options = new Options
+        {
+            AddressStart = "192.168.1.0",
+            AddressMask = "24",
+            MinTime = DateTime.ParseExact("2024-01-01T00:00:00+00:00", "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture),
+            MaxTime = DateTime.ParseExact("2024-01-02T00:00:00+00:00", "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture)
+        };
         var logAnalyzer = new LogAnalyzer();
         var lines = new List<string>
         {
-            "192.168.1.100 2024-04-01 08:15:30",
-            "192.168.1.100 2024-04-01 08:17:22",
-            "192.168.1.101 2024-04-01 08:18:45"
+            "192.168.1.100 2024-01-01T08:15:30+00:00",
+            "192.168.1.100 2024-01-01T09:00:00+00:00",
+            "192.168.1.101 2024-01-01T10:00:00+00:00"
         };
-        var addressStart = "192.168.1.0";
-        var addressMask = "24";
 
-        var result = logAnalyzer.Analyze(lines,  new Options 
-        {
-            AddressStart = addressStart,
-            AddressMask = addressMask
-        });
+        var result = logAnalyzer.Analyze(lines, options);
 
         Assert.Equal(2, result["192.168.1.100"]);
         Assert.Equal(1, result["192.168.1.101"]);
     }
 
     [Fact]
-    public void Analyze_InvalidIPAddress_Ignored()
+    public void Analyze_OutsideTimeRange_ShouldIgnore()
     {
-        var logAnalyzer = new LogAnalyzer();
-        var lines = new List<string> { "InvalidIPAddress 2024-04-01 08:15:30" };
-        var addressStart = "192.168.1.0";
-        var addressMask = "24";
-
-        var result = logAnalyzer.Analyze(lines,  new Options 
+        // Arrange
+        var options = new Options
         {
-            AddressStart = addressStart,
-            AddressMask = addressMask
-        });
+            AddressStart = "192.168.1.0",
+            AddressMask = "24",
+            MinTime = DateTime.ParseExact("2024-01-01T00:00:00+00:00", "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture),
+            MaxTime = DateTime.ParseExact("2024-01-02T00:00:00+00:00", "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture)
+        };
+        var logAnalyzer = new LogAnalyzer();
+        var lines = new List<string>
+        {
+            "192.168.1.100 2024-01-03T08:15:30+00:00", 
+            "192.168.1.101 2024-01-03T09:00:00+00:00"  
+        };
+        var result = logAnalyzer.Analyze(lines, options);
 
         Assert.Empty(result);
     }
 
     [Fact]
-    public void Analyze_OutOfRangeIPAddress_Ignored()
+    public void Analyze_SpecificTime_ShouldInclude()
     {
+        var options = new Options
+        {
+            AddressStart = "192.168.1.0",
+            AddressMask = "24",
+            MinTime = DateTime.ParseExact("2024-01-01T08:00:00+00:00", "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture),
+            MaxTime = DateTime.ParseExact("2024-01-01T09:00:00+00:00", "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture)
+        };
         var logAnalyzer = new LogAnalyzer();
-        var lines = new List<string> { "192.168.1.30 2024-04-01 08:15:30" };
-        var addressStart = "192.168.2.0";
-        var addressMask = "24";
+        var lines = new List<string>
+        {
+            "192.168.1.100 2024-01-01T08:15:30+00:00", 
+            "192.168.1.101 2024-01-01T08:45:00+00:00"  
+        };
 
-        var result = logAnalyzer.Analyze(lines, 
-            new Options 
-            {
-                AddressStart = addressStart,
-                AddressMask = addressMask
-            });
+        var result = logAnalyzer.Analyze(lines, options);
 
-        Assert.Empty(result);
+        Assert.Equal(1, result["192.168.1.100"]);
+        Assert.Equal(1, result["192.168.1.101"]);
     }
-
 }
