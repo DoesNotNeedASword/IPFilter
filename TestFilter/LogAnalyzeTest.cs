@@ -7,7 +7,6 @@ public class LogAnalyzeTests
     [Fact]
     public void Analyze_ValidData_ReturnsCorrectCount()
     {
-        // Arrange
         var logAnalyzer = new LogAnalyzer();
         var lines = new List<string>
         {
@@ -18,7 +17,11 @@ public class LogAnalyzeTests
         var addressStart = "192.168.1.0";
         var addressMask = "24";
 
-        var result = logAnalyzer.Analyze(lines, addressStart, addressMask);
+        var result = logAnalyzer.Analyze(lines,  new Options 
+        {
+            AddressStart = addressStart,
+            AddressMask = addressMask
+        });
 
         Assert.Equal(2, result["192.168.1.100"]);
         Assert.Equal(1, result["192.168.1.101"]);
@@ -32,7 +35,11 @@ public class LogAnalyzeTests
         var addressStart = "192.168.1.0";
         var addressMask = "24";
 
-        var result = logAnalyzer.Analyze(lines, addressStart, addressMask);
+        var result = logAnalyzer.Analyze(lines,  new Options 
+        {
+            AddressStart = addressStart,
+            AddressMask = addressMask
+        });
 
         Assert.Empty(result);
     }
@@ -45,7 +52,12 @@ public class LogAnalyzeTests
         var addressStart = "192.168.2.0";
         var addressMask = "24";
 
-        var result = logAnalyzer.Analyze(lines, addressStart, addressMask);
+        var result = logAnalyzer.Analyze(lines, 
+            new Options 
+            {
+                AddressStart = addressStart,
+                AddressMask = addressMask
+            });
 
         Assert.Empty(result);
     }
