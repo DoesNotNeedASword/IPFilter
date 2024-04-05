@@ -5,10 +5,10 @@ namespace IPFilter;
 public class Options
 {
     [Option('l', "file-log", Required = true, HelpText = "Path to the log file.")]
-    public required string FileLog { get; set; }
+    public string FileLog { get; set; }
 
     [Option('o', "file-output", Required = true, HelpText = "Path to the output file.")]
-    public required string FileOutput { get; set; }
+    public string FileOutput { get; set; }
 
     [Option('s', "address-start", Required = false, Default = null, HelpText = "The lower boundary of the IP address range. Optional, by default all addresses are processed.")]
     public string? AddressStart { get; set; }

@@ -4,7 +4,7 @@ using System.Net;
 
 namespace IPFilter;
 
-public class LogAnalyzer()
+public class LogAnalyzer
 {
     public ConcurrentDictionary<string, int> Analyze(IEnumerable<string> lines, Options options)
     {
@@ -12,15 +12,16 @@ public class LogAnalyzer()
 
         Parallel.ForEach(lines, (line) =>
         {
-            var parts = line.Split(' ');
-            if (parts.Length < 3) return; // Убедитесь, что есть IP-адрес и временная метка
+            var parts = line.Split(new[] { ' ' }, 2); // Используйте перегрузку Split для разделения только на две части
+            if (parts.Length < 2) return; // Проверка, что строка содержит и IP, и дату
 
             var ipString = parts[0];
             if (!IPAddress.TryParse(ipString, out var ipAddress)) return;
 
-            // Соединение частей даты и времени в одну строку и парсинг в DateTime
-            var dateString = $"{parts[1]} {parts[2]}";
-            if (!DateTime.TryParseExact(dateString, "yyyy-MM-dd HH:mm:ss.fffffffK", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var logTime)) return;
+            // dateString содержит полную строку даты и времени в формате ISO 8601
+            var dateString = parts[1];
+            if (!DateTime.TryParseExact(dateString, "yyyy-MM-ddTHH:mm:ssK",
+                    CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var logTime)) return;
 
             if (!InRange(ipAddress, logTime, options)) return;
 
