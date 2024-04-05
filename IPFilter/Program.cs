@@ -2,15 +2,16 @@
 using IPFilter;
 
 Parser.Default.ParseArguments<Options>(args)
-    .WithParsed(options =>
+    .WithParsedAsync(async options =>
     {
         try
         {
             var reader = new LogReader();
             var analyzer = new LogAnalyzer(options, reader);
+            var writer = new OutputWriter(options.FileOutput);
 
-            var results = analyzer.AnalyzeAsync().Result;
-            OutputWriter.WriteResults(options.FileOutput, results);
+            var results = analyzer.AnalyzeAsync().GetAwaiter().GetResult();
+            await writer.WriteResults(results);
         }
         catch (Exception ex)
         {

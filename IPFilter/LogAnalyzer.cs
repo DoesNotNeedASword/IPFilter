@@ -7,30 +7,53 @@ namespace IPFilter;
 
 public class LogAnalyzer(Options options, ILogReader reader)
 {
-    public async Task<ConcurrentDictionary<string, int>> AnalyzeAsync()
+    public async Task<Dictionary<string, int>> AnalyzeAsync()
     {
-        var results = new ConcurrentDictionary<string, int>();
-        await foreach (var line in reader.ReadLinesAsync(options.FileLog))
+        var results = new Dictionary<string, int>();
+        try
         {
-            var spaceIndex = line.IndexOf(' ');
-            if (spaceIndex == -1) continue;
+            await foreach (var line in reader.ReadLinesAsync(options.FileLog).ConfigureAwait(false))
+            {
+                if (!TryParseLine(line, out var ipAddress, out var logTime))
+                    continue;
 
-            var ipString = line[..spaceIndex];
-            var dateString = line[(spaceIndex + 1)..];
+                if (!InRange(ipAddress, logTime))
+                    continue;
 
-            if (!IPAddress.TryParse(ipString, out var ipAddress)) continue;
-
-            if (!DateTime.TryParseExact(dateString, "yyyy-MM-ddTHH:mm:ssK",
-                    CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var logTime)) continue;
-
-            if (!InRange(ipAddress, logTime, options)) continue;
-
-            results.AddOrUpdate(ipString, 1, (key, oldValue) => oldValue + 1);
+                if (!results.TryAdd(ipAddress.ToString(), 1))
+                    results[ipAddress.ToString()]++;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
         }
 
         return results;
     }
-    private bool InRange(IPAddress ipAddress, DateTime logTime, Options options)
+
+    private bool TryParseLine(string line, out IPAddress ipAddress, out DateTime logTime)
+    {
+        var lineSpan = line.AsSpan();
+        var spaceIndex = lineSpan.IndexOf(' ');
+        if (spaceIndex == -1)
+        {
+            ipAddress = null;
+            logTime = default;
+            return false;
+        }
+
+        var ipSpan = lineSpan[..spaceIndex];
+        var dateSpan = lineSpan[(spaceIndex + 1)..];
+
+        if (IPAddress.TryParse(ipSpan.ToString(), out ipAddress) &&
+            DateTime.TryParseExact(dateSpan.ToString(), "yyyy-MM-ddTHH:mm:ssK",
+                CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out logTime)) return true;
+        logTime = default;
+        return false;
+
+    }
+    private bool InRange(IPAddress ipAddress, DateTime logTime)
     {
         if (string.IsNullOrEmpty(options.AddressStart))
             return true;
