@@ -1,75 +1,94 @@
 using System.Globalization;
 using IPFilter;
+using Moq;
 
 namespace TestFilter;
 
 public class LogAnalyzeTests
 {
     [Fact]
-    public void Analyze_WithinTimeRangeAndIPRange_ShouldCountOccurrences()
+    public async Task AnalyzeAsync_ValidData_ReturnsCorrectCounts()
     {
-        var options = new Options
-        {
-            AddressStart = "192.168.1.0",
-            AddressMask = "24",
-            MinTime = DateTime.ParseExact("2024-01-01T00:00:00+00:00", "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture),
-            MaxTime = DateTime.ParseExact("2024-01-02T00:00:00+00:00", "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture)
-        };
-        var logAnalyzer = new LogAnalyzer();
-        var lines = new List<string>
-        {
-            "192.168.1.100 2024-01-01T08:15:30+00:00",
-            "192.168.1.100 2024-01-01T09:00:00+00:00",
-            "192.168.1.101 2024-01-01T10:00:00+00:00"
-        };
+        var mockLogReader = new Mock<ILogReader>();
+        var options = CreateTestOptions();
+        mockLogReader.Setup(reader => reader.ReadLinesAsync(It.IsAny<string>()))
+            .Returns(GetTestLines());
 
-        var result = logAnalyzer.Analyze(lines, options);
+        var analyzer = new LogAnalyzer(options, mockLogReader.Object);
+        
+        var results = await analyzer.AnalyzeAsync();
+        
+        Assert.Equal(2, results["192.168.1.100"]);
+    }
 
-        Assert.Equal(2, result["192.168.1.100"]);
-        Assert.Equal(1, result["192.168.1.101"]);
+   [Fact]
+    public async Task AnalyzeAsync_InvalidIPAddress_Ignored()
+    {
+        var mockLogReader = CreateMockLogReader(new[] { "invalid-ip 2024-01-01T08:15:30+00:00" });
+        var analyzer = new LogAnalyzer(CreateTestOptions(), mockLogReader.Object);
+
+        var results = await analyzer.AnalyzeAsync();
+
+        Assert.Empty(results);
     }
 
     [Fact]
-    public void Analyze_OutsideTimeRange_ShouldIgnore()
+    public async Task AnalyzeAsync_OutOfTimeRange_Ignored()
     {
-        var options = new Options
-        {
-            AddressStart = "192.168.1.0",
-            AddressMask = "24",
-            MinTime = DateTime.ParseExact("2024-01-01T00:00:00+00:00", "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture),
-            MaxTime = DateTime.ParseExact("2024-01-02T00:00:00+00:00", "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture)
-        };
-        var logAnalyzer = new LogAnalyzer();
-        var lines = new List<string>
-        {
-            "192.168.1.100 2024-01-03T08:15:30+00:00", 
-            "192.168.1.101 2024-01-03T09:00:00+00:00"  
-        };
-        var result = logAnalyzer.Analyze(lines, options);
+        var mockLogReader = CreateMockLogReader(new[] { "192.168.1.100 2023-12-31T08:15:30+00:00" });
+        var analyzer = new LogAnalyzer(CreateTestOptions(), mockLogReader.Object);
 
-        Assert.Empty(result);
+        var results = await analyzer.AnalyzeAsync();
+
+        Assert.Empty(results);
     }
 
     [Fact]
-    public void Analyze_SpecificTime_ShouldInclude()
+    public async Task AnalyzeAsync_EmptyLines_Ignored()
     {
-        var options = new Options
+        var mockLogReader = CreateMockLogReader(new[] { "", " " });
+        var analyzer = new LogAnalyzer(CreateTestOptions(), mockLogReader.Object);
+
+        var results = await analyzer.AnalyzeAsync();
+
+        Assert.Empty(results);
+    }
+
+    private static Options CreateTestOptions()
+    {
+        return new Options
         {
+            FileLog = @"..\..\..\logfile.log",
+            FileOutput = @"..\..\..\outputfile.txt",
             AddressStart = "192.168.1.0",
             AddressMask = "24",
-            MinTime = DateTime.ParseExact("2024-01-01T08:00:00+00:00", "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture),
-            MaxTime = DateTime.ParseExact("2024-01-01T09:00:00+00:00", "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture)
+            MinTime = DateTime.Parse("2024-01-01T00:00:00Z", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            MaxTime = DateTime.Parse("2024-04-05T00:00:00Z", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
         };
-        var logAnalyzer = new LogAnalyzer();
-        var lines = new List<string>
+    }
+
+    private static Mock<ILogReader> CreateMockLogReader(IEnumerable<string> lines)
+    {
+        var mockLogReader = new Mock<ILogReader>();
+        mockLogReader.Setup(reader => reader.ReadLinesAsync(It.IsAny<string>()))
+            .Returns(GetTestLines(lines));
+
+        return mockLogReader;
+    }
+
+    private static async IAsyncEnumerable<string> GetTestLines(IEnumerable<string> lines)
+    {
+        foreach (var line in lines)
         {
-            "192.168.1.100 2024-01-01T08:15:30+00:00", 
-            "192.168.1.101 2024-01-01T08:45:00+00:00"  
-        };
-
-        var result = logAnalyzer.Analyze(lines, options);
-
-        Assert.Equal(1, result["192.168.1.100"]);
-        Assert.Equal(1, result["192.168.1.101"]);
+            yield return line;
+        }
+    }
+    private static async IAsyncEnumerable<string> GetTestLines()
+    {
+        yield return "192.168.1.100 2024-01-01T08:15:30+00:00";
+        yield return "192.168.1.100 2024-01-01T09:00:00+00:00";
     }
 }
+
+
+

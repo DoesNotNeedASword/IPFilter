@@ -1,36 +1,35 @@
-﻿using System.Collections.Concurrent;
+﻿using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 
 namespace IPFilter;
 
-public class LogAnalyzer
+public class LogAnalyzer(Options options, ILogReader reader)
 {
-    public ConcurrentDictionary<string, int> Analyze(IEnumerable<string> lines, Options options)
+    public async Task<ConcurrentDictionary<string, int>> AnalyzeAsync()
     {
         var results = new ConcurrentDictionary<string, int>();
-
-        Parallel.ForEach(lines, (line) =>
+        await foreach (var line in reader.ReadLinesAsync(options.FileLog))
         {
-            var parts = line.Split(new[] { ' ' }, 2); // Используйте перегрузку Split для разделения только на две части
-            if (parts.Length < 2) return; // Проверка, что строка содержит и IP, и дату
+            var spaceIndex = line.IndexOf(' ');
+            if (spaceIndex == -1) continue;
 
-            var ipString = parts[0];
-            if (!IPAddress.TryParse(ipString, out var ipAddress)) return;
+            var ipString = line[..spaceIndex];
+            var dateString = line[(spaceIndex + 1)..];
 
-            // dateString содержит полную строку даты и времени в формате ISO 8601
-            var dateString = parts[1];
+            if (!IPAddress.TryParse(ipString, out var ipAddress)) continue;
+
             if (!DateTime.TryParseExact(dateString, "yyyy-MM-ddTHH:mm:ssK",
-                    CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var logTime)) return;
+                    CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var logTime)) continue;
 
-            if (!InRange(ipAddress, logTime, options)) return;
+            if (!InRange(ipAddress, logTime, options)) continue;
 
             results.AddOrUpdate(ipString, 1, (key, oldValue) => oldValue + 1);
-        });
+        }
 
         return results;
     }
-
     private bool InRange(IPAddress ipAddress, DateTime logTime, Options options)
     {
         if (string.IsNullOrEmpty(options.AddressStart))
@@ -54,27 +53,14 @@ public class LogAnalyzer
 
         var mask = maskLength == 0 ? 0 : ~((uint)1 << (32 - maskLength)) + 1;
 
-        var ipAsUint = IpAddressToUInt32(ipAddress);
-        var startAsUint = IpAddressToUInt32(startAddress);
+        var ipAsUint = BinaryPrimitives.ReadUInt32BigEndian(ipAddress.GetAddressBytes());
+        var startAsUint = BinaryPrimitives.ReadUInt32BigEndian(startAddress.GetAddressBytes());
 
-        bool isInIpRange = (ipAsUint & mask) >= (startAsUint & mask);
+        var isInIpRange = (ipAsUint & mask) >= (startAsUint & mask);
     
-        bool isInTimeRange = (!options.MinTime.HasValue || logTime >= options.MinTime.Value) &&
-                             (!options.MaxTime.HasValue || logTime <= options.MaxTime.Value);
+        var isInTimeRange = (!options.MinTime.HasValue || logTime >= options.MinTime.Value) &&
+                            (!options.MaxTime.HasValue || logTime <= options.MaxTime.Value);
 
         return isInIpRange && isInTimeRange;
-    }
-    
-    private uint IpAddressToUInt32(IPAddress ipAddress)
-    {
-        var addressBytes = ipAddress.GetAddressBytes();
-
-        // Перевернуть порядок байтов для little-endian систем
-        if (BitConverter.IsLittleEndian)
-        {
-            Array.Reverse(addressBytes);
-        }
-
-        return BitConverter.ToUInt32(addressBytes, 0);
     }
 }

@@ -6,11 +6,10 @@ Parser.Default.ParseArguments<Options>(args)
     {
         try
         {
-            var reader = new LogReader(options.FileLog);
-            var analyzer = new LogAnalyzer();
+            var reader = new LogReader();
+            var analyzer = new LogAnalyzer(options, reader);
 
-            var lines = reader.ReadLines();
-            var results = analyzer.Analyze(lines, options);
+            var results = analyzer.AnalyzeAsync().Result;
             OutputWriter.WriteResults(options.FileOutput, results);
         }
         catch (Exception ex)
