@@ -1,7 +1,7 @@
 ﻿using CommandLine;
 using IPFilter;
 
-Parser.Default.ParseArguments<Options>(args)
+await Parser.Default.ParseArguments<Options>(args)
     .WithParsedAsync(async options =>
     {
         try
