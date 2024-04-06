@@ -16,8 +16,8 @@ public class Options
     [Option('m', "address-mask", Required = false, Default = null, HelpText = "Subnet mask defining the upper boundary of the address range as a decimal number. Optional, if not set, all addresses starting from the lower boundary are processed. Cannot be used without address-start.")]
     public string? AddressMask { get; set; }
     [Option("min-time", Required = false, HelpText = "Minimum log time to process. Optional, if not set, all times are processed.")]
-    public DateTime? MinTime { get; set; }
+    public DateTimeOffset? MinTime { get; set; }
 
     [Option("max-time", Required = false, HelpText = "Maximum log time to process. Optional, if not set, all times are processed.")]
-    public DateTime? MaxTime { get; set; }
+    public DateTimeOffset? MaxTime { get; set; }
 }

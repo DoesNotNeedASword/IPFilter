@@ -32,7 +32,7 @@ public class LogAnalyzer(Options options, ILogReader reader)
         return results;
     }
 
-    private bool TryParseLine(string line, out IPAddress ipAddress, out DateTime logTime)
+    private bool TryParseLine(string line, out IPAddress ipAddress, out DateTimeOffset logTime)
     {
         var lineSpan = line.AsSpan();
         var spaceIndex = lineSpan.IndexOf(' ');
@@ -47,13 +47,13 @@ public class LogAnalyzer(Options options, ILogReader reader)
         var dateSpan = lineSpan[(spaceIndex + 1)..];
 
         if (IPAddress.TryParse(ipSpan.ToString(), out ipAddress) &&
-            DateTime.TryParseExact(dateSpan.ToString(), "yyyy-MM-ddTHH:mm:ssK",
-                CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out logTime)) return true;
+            DateTimeOffset.TryParseExact(dateSpan.ToString(), "yyyy-MM-ddTHH:mm:ssK",
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out logTime)) return true;
         logTime = default;
         return false;
 
     }
-    private bool InRange(IPAddress ipAddress, DateTime logTime)
+    private bool InRange(IPAddress ipAddress, DateTimeOffset logTime)
     {
         if (string.IsNullOrEmpty(options.AddressStart))
             return true;
