@@ -10,7 +10,7 @@ Before running this program, ensure you have [.NET](https://dotnet.microsoft.com
 
 To execute the program, use the following command in the terminal or command prompt from the project's root directory:
 ```
-.\IPFilter.exe --file-log "..\..\..\logfile.log" --file-output "..\..\..\outputfile.txt" --address-start "192.168.1.0" --address-mask "24" --min-time "2024-01-01T00:00:00Z" --max-time "2024-04-05T00:00:00Z"
+ .\IPFilter.exe --file-log "..\..\..\logfile.log" --file-output "..\..\..\outputfile.txt" --address-start "0.0.0.0" --address-mask "24" --min-time "2023-04-11T08:04:37+03:00" --max-time "2024-04-11T08:04:37+03:00"
 ```
 ### Optional Parameters
 
